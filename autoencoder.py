@@ -1,4 +1,7 @@
 import numpy as np
+import os
+import pickle
+
 from keras import Model
 from keras.layers import Input, Conv2D, BatchNormalization, ReLU, Flatten, \
     Dense, Reshape, Conv2DTranspose, Activation
@@ -50,6 +53,44 @@ class Autoencoder:
                        batch_size=batch_size,
                        epochs=num_epochs,
                        shuffle=True)
+
+    def save(self, save_folder="."):
+        self._create_folder_if_necessary(save_folder)
+        self._save_parameters(save_folder)
+        self._save_weights(save_folder)
+
+    def load_weights(self, filepath):
+        self.model.load_weights(filepath)
+
+    @classmethod
+    def load(cls, save_folder="."):
+        params_path = os.path.join(save_folder, 'params.pkl')
+        with open(params_path, "rb") as f:
+            parameters = pickle.load(f)
+            autoencoder = Autoencoder(*parameters)
+        weights_path = os.path.join(save_folder, 'weights.h5')
+        autoencoder.load_weights(weights_path)
+        return autoencoder
+
+    def _create_folder_if_necessary(self, save_folder):
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+
+    def _save_parameters(self, save_folder):
+        filepath = os.path.join(save_folder, 'params.pkl')
+        parameters = [
+            self.input_shape,
+            self.conv_filters,
+            self.conv_kernels,
+            self.conv_strides,
+            self.latent_space_dims
+        ]
+        with open(filepath, 'wb') as f:
+            pickle.dump(parameters, f)
+
+    def _save_weights(self, save_folder):
+        filepath = os.path.join(save_folder, 'weights.h5')
+        self.model.save_weights(filepath)
 
     def _build(self):
         self._build_encoder()
