@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from autoencoder import Autoencoder
+from autoencoder import VAE
 from train import load_mnist
 
 
@@ -51,7 +51,7 @@ def plot_generated_images(generated_images):
 
 
 if __name__ == '__main__':
-    autoencoder = Autoencoder.load('mnist_ae')
+    autoencoder = VAE.load('mnist_vae')
     x_train, y_train, x_test, y_test = load_mnist()
 
     num_sample_images = 12
@@ -69,7 +69,3 @@ if __name__ == '__main__':
     reconstructed_images, latent_representations = autoencoder.reconstruct(
         sample_images)
     plot_images_encoded_in_latent_space(latent_representations, sample_labels)
-
-    generated_images = autoencoder.generate(
-        [[-80, -60], [80, 60], [-80, 60], [80, -60]])
-    plot_generated_images(generated_images)

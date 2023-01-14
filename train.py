@@ -1,5 +1,5 @@
 from keras.datasets import mnist
-from autoencoder import Autoencoder
+from autoencoder import VAE
 
 LEARNING_RATE = 0.0005
 BATCH_SIZE = 32
@@ -16,11 +16,11 @@ def load_mnist():
 
 
 def train(x_train, learning_rate, batch_size, epochs):
-    autoencoder = Autoencoder(input_shape=(28, 28, 1),
-                              conv_filters=(32, 64, 64, 64),
-                              conv_kernels=(3, 3, 3, 3),
-                              conv_strides=(1, 2, 2, 1),
-                              latent_space_dims=2)
+    autoencoder = VAE(input_shape=(28, 28, 1),
+                      conv_filters=(32, 64, 64, 64),
+                      conv_kernels=(3, 3, 3, 3),
+                      conv_strides=(1, 2, 2, 1),
+                      latent_space_dims=2)
     autoencoder.summary()
     autoencoder.compile(learning_rate=learning_rate)
     autoencoder.train(x_train, batch_size, epochs)
@@ -30,6 +30,6 @@ def train(x_train, learning_rate, batch_size, epochs):
 if __name__ == '__main__':
     x_train, _, _, _ = load_mnist()
     autoencoder = train(x_train, LEARNING_RATE, BATCH_SIZE, EPOCHS)
-    autoencoder.save('mnist_ae')
-    autoencoder2 = Autoencoder.load('mnist_ae')
-    autoencoder.summary()
+    autoencoder.save('mnist_vae')
+    autoencoder2 = VAE.load('mnist_vae')
+    autoencoder2.summary()
