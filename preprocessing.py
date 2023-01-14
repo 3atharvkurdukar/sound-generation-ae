@@ -2,6 +2,7 @@ import librosa
 import os
 import numpy as np
 import pickle
+from tqdm import tqdm
 
 
 class Loader:
@@ -58,7 +59,7 @@ class LogSpectrogramExtractor:
         return log_spectrogram
 
 
-class MinMaxNormaliser:
+class MinMaxNormalizer:
     """
     MinMaxNormaliser is responsible for normalising an array
     """
@@ -87,6 +88,7 @@ class Saver:
         save_path = self._generate_file_path(file_path)
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         np.save(save_path, feature)
+        return save_path
 
     def save_min_max_values(self, min_max_values):
         save_path = os.path.join(
@@ -138,10 +140,10 @@ class PreprocessingPipeline:
     def process(self, audio_files_dir):
         print(audio_files_dir)
         for root, _, files in os.walk(audio_files_dir):
-            for file in files:
+            for file in tqdm(files):
                 file_path = os.path.join(root, file)
                 self._process_file(file_path)
-                print(f'Processed file: {file_path}')
+                # print(f'Processed file: {file_path}')
         self.saver.save_min_max_values(self.min_max_values)
 
     def _process_file(self, file_path):
@@ -178,14 +180,14 @@ if __name__ == '__main__':
     SAMPLE_RATE = 22050
     MONO = True
 
-    SPECTROGRAM_SAVE_DIR = 'dataset/fsdd/spectrograms'
+    SPECTROGRAM_SAVE_DIR = 'datasets/fsdd/spectrograms'
     MIN_MAX_VALUES_SAVE_DIR = 'datasets/fsdd'
-    FILES_DIR = 'daasets/fsdd/audio'
+    FILES_DIR = 'datasets/fsdd/audio'
 
     loader = Loader(SAMPLE_RATE, DURATION, MONO)
     padder = Padder()
     log_spectrogram_extractor = LogSpectrogramExtractor(FRAME_SIZE, HOP_LENGTH)
-    min_max_normaliser = MinMaxNormaliser(0, 1)
+    min_max_normaliser = MinMaxNormalizer(0, 1)
     saver = Saver(SPECTROGRAM_SAVE_DIR, MIN_MAX_VALUES_SAVE_DIR)
 
     pipeline = PreprocessingPipeline()
