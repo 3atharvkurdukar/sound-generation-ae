@@ -1,13 +1,16 @@
+import tensorflow as tf
 import numpy as np
 import os
 import pickle
 
 from keras import Model
 from keras.layers import Input, Conv2D, BatchNormalization, ReLU, Flatten, \
-    Dense, Reshape, Conv2DTranspose, Activation
+    Dense, Reshape, Conv2DTranspose, Activation, Lambda
 from keras.optimizers import Adam
 from keras.losses import MeanSquaredError
 from keras import backend as K
+
+tf.compat.v1.disable_eager_execution()
 
 
 class Autoencoder:
@@ -75,7 +78,7 @@ class Autoencoder:
         params_path = os.path.join(save_folder, 'params.pkl')
         with open(params_path, "rb") as f:
             parameters = pickle.load(f)
-            autoencoder = Autoencoder(*parameters)
+            autoencoder = cls(*parameters)
         weights_path = os.path.join(save_folder, 'weights.h5')
         autoencoder.load_weights(weights_path)
         return autoencoder
@@ -202,10 +205,83 @@ class Autoencoder:
         self.model = Model(model_input, model_output, name='autoencoder')
 
 
+def calculate_reconstruction_loss(y_target, y_predicted):
+    error = y_target - y_predicted
+    return K.mean(K.square(error), axis=[1, 2, 3])
+
+
+def calculate_kl_loss(autoencoder):
+    # wrap `_calculate_kl_loss` such that it takes the model as an argument,
+    # returns a function which can take arbitrary number of arguments
+    # (for compatibility with `metrics` and utility in the loss function)
+    # and returns the kl loss
+    def _calculate_kl_loss(*args):
+        kl_loss = -0.5 * K.sum(1 + autoencoder.log_variance - K.square(autoencoder.mu) -
+                               K.exp(autoencoder.log_variance), axis=1)
+        return kl_loss
+    return _calculate_kl_loss
+
+
+class VAE(Autoencoder):
+    """
+    VAE represents a deep convolutional variational autoencoder architectire with
+    mirrored encoder and decoder components.
+    """
+
+    def __init__(self,
+                 input_shape: tuple,
+                 conv_filters: tuple,
+                 conv_kernels: tuple,
+                 conv_strides: tuple,
+                 latent_space_dims: tuple) -> None:
+        self.mu = None
+        self.log_variance = None
+        self.reconstruction_loss_weight = 1000
+        super().__init__(input_shape,
+                         conv_filters,
+                         conv_kernels,
+                         conv_strides,
+                         latent_space_dims)
+
+    def compile(self, learning_rate: float):
+        optimizer = Adam(lr=learning_rate)
+        self.model.compile(optimizer=optimizer,
+                           loss=self._calculate_combined_loss,
+                           metrics=[calculate_reconstruction_loss,
+                                    calculate_kl_loss(self)])
+
+    def _calculate_combined_loss(self, y_target, y_predicted):
+        reconstruction_loss = calculate_reconstruction_loss(
+            y_target, y_predicted)
+        kl_loss = calculate_kl_loss(self)()
+        combined_loss = self.reconstruction_loss_weight * reconstruction_loss + kl_loss
+        return combined_loss
+
+    def _add_bottleneck(self, x):
+        """Flatten data and add the bottleneck layer with Gaussian sampling (dense layer)."""
+        self._shape_before_bottleneck = K.int_shape(x)[1:]
+        # Ignore the batch size dimension
+        x = Flatten(name='encoder_flatten')(x)
+
+        self.mu = Dense(units=self.latent_space_dims, name='mu')(x)
+        self.log_variance = Dense(
+            units=self.latent_space_dims, name='log_variance')(x)
+
+        def sample_point_from_normal_distribution(args):
+            mu, log_variance = args
+            epsilon = K.random_normal(shape=K.shape(mu), mean=0., stddev=1.)
+            sampled_point = mu + K.exp(log_variance / 2) * epsilon
+            return sampled_point
+
+        x = Lambda(sample_point_from_normal_distribution,
+                   name='encoder_output')([self.mu, self.log_variance])
+        return x
+
+
 if __name__ == '__main__':
-    autoencoder = Autoencoder(input_shape=(28, 28, 1),
-                              conv_filters=(32, 64, 64, 64),
-                              conv_kernels=(3, 3, 3, 3),
-                              conv_strides=(1, 2, 2, 1),
-                              latent_space_dims=2)
+    autoencoder = VAE(input_shape=(28, 28, 1),
+                      conv_filters=(32, 64, 64, 64),
+                      conv_kernels=(3, 3, 3, 3),
+                      conv_strides=(1, 2, 2, 1),
+                      latent_space_dims=2)
     autoencoder.summary()
